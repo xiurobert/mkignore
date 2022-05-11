@@ -46,12 +46,32 @@ pub fn put_stuff(stuff: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+fn did_format(file_contents: &str, format: &Format) -> bool {
+    match format {
+        Format::JB => {
+            file_contents.contains("<mkignore jb>")
+        }
+        Format::Py => {
+            file_contents.contains("<mkignore py>")
+        }
+    }
+}
+
 enum Format {
     JB,
     Py,
 }
 
-fn build_ignore(formats: Vec<Format>) -> String {
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Format::JB => write!(f, "jb"),
+            Format::Py => write!(f, "py"),
+        }
+    }
+}
+
+fn build_ignore(formats: Vec<&Format>) -> String {
     let mut ignore_string = String::new();
     for format in formats {
         match format {
@@ -71,7 +91,6 @@ fn build_ignore(formats: Vec<Format>) -> String {
             },
         }
         ignore_string.push('\n');
-
     }
     ignore_string
 }
@@ -79,7 +98,6 @@ fn build_ignore(formats: Vec<Format>) -> String {
 
 fn put_in_gitignore(formats: Vec<Format>) {
 
-    let ignore_string = build_ignore(formats);
 
     let ignore_file = File::options()
         .read(true)
@@ -87,6 +105,27 @@ fn put_in_gitignore(formats: Vec<Format>) {
         .create(true)
         .open("test.gitignore");
     if let Ok(f_ignore) = ignore_file {
+        let contents = read_file(&f_ignore).unwrap_or_else(|| {
+            eprintln!("<F> Failed to read in test.gitignore");
+            String::new()
+        });
+        let mut actual_formats: Vec<&Format> = Vec::new();
+        for fmt in &formats {
+            if did_format(&contents, fmt) {
+                println!(" - Already had {}", fmt);
+                continue;
+            }
+            println!(" - Adding {}", fmt);
+            actual_formats.push(fmt);
+        }
+
+        if actual_formats.is_empty() {
+            println!(" - No new formats to add");
+            return;
+        }
+
+        let ignore_string = build_ignore(actual_formats);
+
         match append_to_file(f_ignore, &ignore_string) {
             Ok(bytes_written) => {
                 println!("Wrote {} bytes", bytes_written);

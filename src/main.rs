@@ -8,7 +8,6 @@ fn main() {
             let placed = put_stuff(args);
             match placed {
                 Ok(_) => {
-                    println!("Successfully placed files");
                     exit(0);
                 }
                 Err(e) => {
