@@ -30,11 +30,11 @@ pub fn put_stuff(stuff: Vec<String>) -> Result<(), String> {
     for thing in stuff {
         match thing.as_str() {
             "jb" => {
-                println!("Processing jetbrains");
+                println!(" - Processing [jetbrains]");
                 put_jetbrains_in_gitignore();
             }
             "py" => {
-                println!("Processing python");
+                println!(" - Processing [python]");
             }
             _ => {}
         }
@@ -45,34 +45,58 @@ pub fn put_stuff(stuff: Vec<String>) -> Result<(), String> {
 
 
 fn put_jetbrains_in_gitignore() {
-    let jb_gitignore_file = File::options().
-        read(true).
-        open("ignore-texts/jb.mkignore");
-
-    if let Ok(..) = jb_gitignore_file {
-        let mut buf = String::new();
-        if let Ok(r) = jb_gitignore_file.unwrap().read_to_string(&mut buf) {
-            println!("Read {} bytes from jb.mkignore", r);
-            let maybe_gitignore_file = File::options()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(".gitignore");
-            if let Ok(mut gitignore_file) = maybe_gitignore_file {
-                let mut current_contents = String::new();
-                gitignore_file.read_to_string(&mut current_contents);
-                let maybe_written = gitignore_file.write(buf.as_bytes());
-                if let Ok(b) =  maybe_written {
-                    println!("Ok, written {} bytes", b);
+    if let Some(jb_ignore) = read_in("ignore-texts/jb.mkignore", false) {
+        let ignore_file = File::options().read(true).write(true).create(true).open(".gitignore");
+        if let Ok(mut f_ignore) = ignore_file {
+            match append_to_file(f_ignore, &jb_ignore) {
+                Ok(bytes_written) => {
+                    println!("Wrote {} bytes", bytes_written);
                 }
-            } else {
-                eprintln!("Something went wrong trying to create/open .gitignore");
+                Err(e) => {
+                    eprintln!("{}", e);
+                }
             }
+        } else {
+            eprintln!("Couldn't write")
         }
-
+    } else {
+        eprintln!("The jb.mkignore file was empty");
     }
 
+}
+
+fn append_to_file(mut file: File, stuff: &str) -> Result<usize, String> {
+    if let Some(curr_contents) = read_file(&file) {
+        let mut new_contents = curr_contents;
+        new_contents.push_str(stuff);
+        new_contents.push('\n');
+
+        if let Ok(bytes_written) = file.write(new_contents.as_bytes()) {
+            return Ok(bytes_written)
+        }
+
+        return Err(String::from("Could not append to the file"));
+    }
+    Err(String::from("The file "))
+}
 
 
+fn read_file(mut file: &File) -> Option<String> {
+    let mut buffer = String::new();
+    if let Ok(..) = file.read_to_string(&mut buffer) {
+        return Some(buffer);
+    }
+    None
+}
 
+fn read_in(file_path: &str, try_make: bool) -> Option<String> {
+    let the_file = File::options()
+        .read(true)
+        .create(try_make)
+        .open(file_path);
+
+    if let Ok(f) = the_file {
+        return read_file(&f);
+    }
+    None
 }
